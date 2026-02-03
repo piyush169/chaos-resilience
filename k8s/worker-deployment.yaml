@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: worker
+        image: chaos-engine:latest
+        command: ["./chaos-worker"] 
+        env:
+        - name: REDIS_URL
+          value: "redis-service:6379"
+        securityContext:
+          capabilities:
+            add: ["NET_ADMIN"] 
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
