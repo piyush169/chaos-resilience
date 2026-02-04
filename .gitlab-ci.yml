@@ -18,7 +18,22 @@ build_image:
     - docker build -t $DOCKER_IMAGE .
     - docker push $DOCKER_IMAGE
 
+.aws_auth: &aws_auth
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  before_script:
+    - mkdir -p ~/.aws
+    - |
+      echo "[default]
+      role_arn = ${AWS_ROLE_ARN}
+      web_identity_token_file = /tmp/web_identity_token" > ~/.aws/config
+    - echo "${GITLAB_OIDC_TOKEN}" > /tmp/web_identity_token
+    - export AWS_CONFIG_FILE=~/.aws/config
+
+  
 plan_infra:
+  <<: *aws_auth
   stage: plan
   image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
@@ -32,6 +47,7 @@ plan_infra:
       - infra/plan.cache
 
 apply_infra:
+  <<: *aws_auth
   stage: deploy
   image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
