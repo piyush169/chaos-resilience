@@ -1,10 +1,14 @@
 provider "aws" {
     region = "ap-south-1"
 }
+variable "public_key" {
+  description = "The public SSH key for the EC2 instance"
+  type        = string
+}
 
 //security group for api
 resource "aws_security_group" "chaos_sg" {
-    name = "chaos_sg"
+    name = "chaos-sg-${terraform.workspace}"
     ingress {
         from_port = 8080
         to_port = 8080
@@ -24,12 +28,16 @@ resource "aws_security_group" "chaos_sg" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 }
+resource "aws_key_pair" "chaos_deployer" {
+  key_name   = "chaos-keypair"
+  public_key = var.public_key
+}
 
 //
 resource "aws_instance" "chaos_target" {
     ami          = "ami-0ff5003538b60d5ec" 
-    instance_type = "t2.medium"
-    key_name      = "chaos-keypair"
+    instance_type = "t3.micro"
+    key_name   = aws_key_pair.chaos_deployer.key_name
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
     depends_on = [aws_security_group.chaos_sg]
     iam_instance_profile = "ChaosWorkerRole"
