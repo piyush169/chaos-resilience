@@ -17,24 +17,10 @@ build_image:
 
 deploy_infra:
   stage: deploy
-  image: 
-    name: hashicorp/terraform:latest
-    entrypoint: [""]
+  image: registry.gitlab.com/gitlab-org/terraform-images:latest
   variables:
     TF_STATE_NAME: "chaos-prod"
-    TF_ADDRESS: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}"
-  id_tokens:
-    GITLAB_OIDC_TOKEN:
-      aud: https://gitlab.com
   script:
     - cd infra
-    - terraform init\
-      -backend-config="address=${TF_ADDRESS}" \
-        -backend-config="lock_address=${TF_ADDRESS}/lock" \
-        -backend-config="unlock_address=${TF_ADDRESS}/lock" \
-        -backend-config="username=${GITLAB_USER_LOGIN}" \
-        -backend-config="password=${CI_JOB_TOKEN}" \
-        -backend-config="lock_method=POST" \
-        -backend-config="unlock_method=DELETE" \
-        -reconfigure
-    - terraform apply -auto-approve
+    - gitlab-terraform init
+    - gitlab-terraform apply
