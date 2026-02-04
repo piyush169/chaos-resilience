@@ -5,6 +5,8 @@ stages:
 
 variables:
   DOCKER_IMAGE: $CI_REGISTRY_IMAGE:latest
+  AWS_ROLE_ARN: "arn:aws:iam::510674263883:role/GitLabPipelineRole"
+  AWS_REGION: "ap-south-1"
 
 build_image:
   stage: build
