@@ -1,5 +1,6 @@
 stages:
   - build
+  - plan
   - deploy
 
 variables:
@@ -15,7 +16,20 @@ build_image:
     - docker build -t $DOCKER_IMAGE .
     - docker push $DOCKER_IMAGE
 
-deploy_infra:
+plan_infra:
+  stage: plan
+  image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
+  variables:
+    TF_STATE_NAME: "chaos-prod"
+  script:
+    - cd infra
+    - gitlab-terraform init
+    - gitlab-terraform plan
+  artifacts:
+    paths:
+      - infra/plan.cache
+
+apply_infra:
   stage: deploy
   image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
@@ -24,3 +38,6 @@ deploy_infra:
     - cd infra
     - gitlab-terraform init
     - gitlab-terraform apply
+  dependencies:
+    - plan_infra
+  when: manual
