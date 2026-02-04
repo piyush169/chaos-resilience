@@ -17,7 +17,7 @@ build_image:
 
 deploy_infra:
   stage: deploy
-  image: registry.gitlab.com/gitlab-org/terraform-images:latest
+  image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
     TF_STATE_NAME: "chaos-prod"
   script:
