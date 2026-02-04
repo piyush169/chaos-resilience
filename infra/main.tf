@@ -27,7 +27,7 @@ resource "aws_security_group" "chaos_sg" {
 
 //
 resource "aws_instance" "chaos_target" {
-    ami          = "ami-0c55b159cbfafe1f0" 
+    ami          = "ami-0ff5003538b60d5ec" 
     instance_type = "t2.medium"
     key_name      = "chaos-keypair"
     security_groups = [aws_security_group.chaos_sg.id]

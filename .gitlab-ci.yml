@@ -58,4 +58,4 @@ apply_infra:
     - gitlab-terraform apply
   dependencies:
     - plan_infra
-  when: manual
+  
