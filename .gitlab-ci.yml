@@ -62,10 +62,13 @@ apply_infra:
   
 deploy_pods:
   stage: k8s_deploy
-  image: bitnami/kubectl:latest
+  image: 
+    name: bitnami/kubectl:latest
+    entrypoint: [""]
   script:
     # 1. Get the IP from Terraform output
     # 2. Use SSH to run the deployment on the EC2
+    - chmod 400 $SSH_PRIVATE_KEY
     - ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
   dependencies:
     - apply_infra
