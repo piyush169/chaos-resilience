@@ -35,12 +35,18 @@ resource "aws_key_pair" "chaos_deployer" {
 
 //
 resource "aws_instance" "chaos_target" {
-    ami          = "ami-0ff5003538b60d5ec" 
+    ami          = "ami-019715e0d74f695be" 
     instance_type = "t3.micro"
     key_name   = aws_key_pair.chaos_deployer.key_name
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
     depends_on = [aws_security_group.chaos_sg]
     iam_instance_profile = "ChaosWorkerRole"
+
+    tags = {
+    Name        = "Chaos-Lab-Instance"
+    Environment = "Dev"
+    Project     = "Chaos-Resilience"
+  }
 
     user_data = <<-EOF
                 #!/bin/bash
