@@ -70,12 +70,11 @@ deploy_pods:
     name: bitnami/kubectl:latest
     entrypoint: [""]
   script:
-    # 1. Get the IP from Terraform output
-    # 2. Use SSH to run the deployment on the EC2
-    - apt-get update && apt-get install -y openssh-client
+    - apk add --no-cache openssh-client
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
     - cp "$SSH_PRIVATE_KEY" /tmp/id_rsa
     - chmod 400 /tmp/id_rsa
+    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
   dependencies:
     - apply_infra
