@@ -73,7 +73,8 @@ deploy_pods:
     # 1. Get the IP from Terraform output
     # 2. Use SSH to run the deployment on the EC2
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
-    - chmod 400 $SSH_PRIVATE_KEY
-    - ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
+    - cp "$SSH_PRIVATE_KEY" /tmp/id_rsa
+    - chmod 400 /tmp/id_rsa
+    - ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
   dependencies:
     - apply_infra
