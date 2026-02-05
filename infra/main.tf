@@ -56,6 +56,8 @@ resource "aws_instance" "chaos_target" {
                 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
                 sudo install minikube-linux-amd64 /usr/local/bin/minikube
                 sudo -u ubuntu minikube start --driver=docker
+                sudo mkdir -p /home/ubuntu/k8s
+                sudo minikube mount /home/ubuntu/k8s:/k8s &
             EOF
   
 }
