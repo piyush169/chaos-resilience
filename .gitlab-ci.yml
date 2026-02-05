@@ -69,8 +69,9 @@ deploy_pods:
   image: alpine:latest
   script:
     - apk add --no-cache openssh-client curl
-    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    - install -m 0755 kubectl /usr/local/bin/kubectl
+    - curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
     - cp "$SSH_PRIVATE_KEY" /tmp/id_rsa
     - chmod 400 /tmp/id_rsa
