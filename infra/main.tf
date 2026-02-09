@@ -36,7 +36,7 @@ resource "aws_key_pair" "chaos_deployer" {
 //
 resource "aws_instance" "chaos_target" {
     ami          = "ami-019715e0d74f695be" 
-    instance_type = "t3.micro"
+    instance_type = "m7i-flex.large"
     key_name   = aws_key_pair.chaos_deployer.key_name
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
     depends_on = [aws_security_group.chaos_sg]
