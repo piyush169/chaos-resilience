@@ -72,7 +72,9 @@ deploy_pods:
     - apply_infra
   script:
     - apk add --no-cache openssh-client curl
-    - if [ -f deploy.env ]; then export $(cat deploy.env | xargs); fi
+    - if [ -f deploy.env ]; then set -a; source deploy.env; set +a; fi
+    - echo "Confirmed Target IP is $EC2_PUBLIC_IP"
+    - if [ -z "$EC2_PUBLIC_IP" ]; then echo "FATAL EC2_PUBLIC_IP is still empty!"; exit 1; fi
     - curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/
