@@ -90,7 +90,7 @@ deploy_pods:
         minikube kubectl -- create secret docker-registry gitlab-registry-credentials \
           --docker-server=registry.gitlab.com \
           --docker-username=gitlab-ci-token \
-          --docker-password='${CI_JOB_TOKEN}' \
+          --docker-password=\$CI_JOB_TOKEN
           --docker-email=piyu1219@gmail.com;
           
         minikube kubectl -- apply -f /home/ubuntu/k8s/
