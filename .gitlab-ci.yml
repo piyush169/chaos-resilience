@@ -83,7 +83,8 @@ deploy_pods:
     - mv kubectl /usr/local/bin/
     - echo `Target IP $EC2_PUBLIC_IP `
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
-    - cp "$SSH_PRIVATE_KEY" /tmp/id_rsa
+    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
+    - echo "" >> /tmp/id_rsa
     - chmod 400 /tmp/id_rsa
     - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
