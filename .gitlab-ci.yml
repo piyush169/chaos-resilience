@@ -91,7 +91,10 @@ deploy_pods:
           --docker-server=registry.gitlab.com \
           --docker-username=gitlab-ci-token \
           --docker-password=${CI_JOB_TOKEN} \
-          --docker-email=piyush@piyu.works
+          --docker-email=piyush@piyu.works;
+          
+        
+        minikube kubectl -- apply -f /home/ubuntu/k8s/
       "
     - ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
   
