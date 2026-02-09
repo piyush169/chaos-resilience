@@ -88,14 +88,19 @@ deploy_pods:
     - chmod 400 /tmp/id_rsa
     - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
-      echo "Waiting for Minikube to initialize..."
-      for i in {1..30}; do
+      echo "Waiting for Minikube and Kubeconfig to be ready..."
+      MAX_RETRIES=30
+      COUNT=0
+      # Loop until 'minikube status' confirms the cluster is Running
+      while [ $COUNT -lt $MAX_RETRIES ]; do
         if ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube status | grep -q 'Running'"; then
-          echo "Minikube is up!"
+          echo "Minikube is up and Running!"
           break
         fi
-        echo "Still waiting... ($i/30)"
-        sleep 10
+        COUNT=$((COUNT + 1))
+        echo "Still waiting for cluster... ($COUNT/$MAX_RETRIES)"
+        sleep 15
       done
+      if [ $COUNT -eq $MAX_RETRIES ]; then echo "Timeout waiting for Minikube"; exit 1; fi
     - ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "minikube kubectl -- apply -f /home/ubuntu/k8s/"
   
