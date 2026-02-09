@@ -12,8 +12,6 @@ spec:
       labels:
         app: worker
     spec:
-      imagePullSecrets:
-      - name: gitlab-registry-credentials
       containers:
       - name: worker
         image: registry.gitlab.com/piyush169/chaos-resilience/chaos-engine:latest 
