@@ -57,8 +57,8 @@ apply_infra:
     - cd infra
     - gitlab-terraform init
     - gitlab-terraform apply
-    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > ../deploy.env
-    - if [ -s ../deploy.env ]; then echo "Artifact created successfully"; else echo "Artifact is empty!"; exit 1; fi
+    - terraform output -raw ec2_public_ip > ${CI_PROJECT_DIR}/deploy.env
+    - cat ${CI_PROJECT_DIR}/deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
@@ -72,7 +72,7 @@ deploy_pods:
     - apply_infra
   script:
     - apk add --no-cache openssh-client curl
-    - if [ -f deploy.env ]; then set -a; source deploy.env; set +a; fi
+    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
     - echo "Confirmed Target IP is $EC2_PUBLIC_IP"
     - if [ -z "$EC2_PUBLIC_IP" ]; then echo "FATAL EC2_PUBLIC_IP is still empty!"; exit 1; fi
     - curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
