@@ -57,8 +57,8 @@ apply_infra:
     - cd infra
     - gitlab-terraform init
     - gitlab-terraform apply
-    - terraform output -raw ec2_public_ip > deploy.env
-    - cat deploy.env
+    - terraform output -raw ec2_public_ip > ${CI_PROJECT_DIR}/deploy.env || true
+    - echo "Captured IP:" && cat ${CI_PROJECT_DIR}/deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
