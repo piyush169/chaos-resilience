@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: registry.gitlab.com/piyush169/chaos-resilience/chaos-engine:latest 
+        image: registry.gitlab.com/piyush169/chaos-resilience:latest 
         imagePullPolicy: Always
         command: ["./chaos-worker"] 
         env:
