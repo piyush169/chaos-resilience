@@ -81,6 +81,7 @@ deploy_pods:
   
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - echo "" >> ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/ #sync manifest to remote server
     - |
