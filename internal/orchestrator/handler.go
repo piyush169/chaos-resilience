@@ -1,20 +1,36 @@
 package orchestrator
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes" // This fixes "undefined: kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type Orchestrator struct {
-	rdb *redis.Client
+	rdb       *redis.Client
+	k8sClient *kubernetes.Clientset
 }
 
 func New(rdb *redis.Client) *Orchestrator {
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+
+		panic(err.Error())
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	return &Orchestrator{
-		rdb: rdb,
+		rdb:       rdb,
+		k8sClient: clientset,
 	}
 }
 
@@ -30,7 +46,7 @@ func (o *Orchestrator) HandleChaos(c *gin.Context) {
 	}
 
 	//Send a control message to the Redis Stream that Workers are listening to
-	err := o.rdb.XAdd(context.Background(), &redis.XAddArgs{
+	err := o.rdb.XAdd(c.Request.Context(), &redis.XAddArgs{
 		Stream: "control_stream",
 		Values: map[string]interface{}{
 			"action":     req.Action,
@@ -46,13 +62,39 @@ func (o *Orchestrator) HandleChaos(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Chaos signal sent to cluster"})
 }
 
-// GetClusterStatus fetches current metrics for your React Flow map
 func (o *Orchestrator) GetClusterStatus(c *gin.Context) {
-	// In a real setup, this would query the Kubernetes API
-	// For now, we return mock data that your frontend can use
+
+	queueLag, err := o.rdb.LLen(c.Request.Context(), "chaos_tasks").Result()
+	if err != nil {
+		queueLag = 0 // Fallback if Redis is empty
+	}
+
+	// 2. Fetch running pods from K8s API
+
+	pods, err := o.k8sClient.CoreV1().Pods("default").List(c.Request.Context(), metav1.ListOptions{
+		LabelSelector: "app=worker",
+	})
+
+	runningCount := 0
+	if err == nil {
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == "Running" {
+				runningCount++
+			}
+		}
+	}
+
+	// 3. Determine status based on thresholds
+	status := "healthy"
+	if queueLag > 20 {
+		status = "under_pressure"
+	} else if runningCount > 5 {
+		status = "scaling"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"pods_running": 2,
-		"queue_lag":    15,
-		"status":       "under_pressure",
+		"pods_running": runningCount,
+		"queue_lag":    queueLag,
+		"status":       status,
 	})
 }

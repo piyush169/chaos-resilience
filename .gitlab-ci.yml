@@ -9,15 +9,21 @@ variables:
   AWS_ROLE_ARN: "arn:aws:iam::510674263883:role/GitLabPipelineRole"
   AWS_REGION: "ap-south-1"
 
-build_image:
+build_images:
   stage: build
   image: docker:latest
   services:
     - docker:dind
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $DOCKER_IMAGE .
-    - docker push $DOCKER_IMAGE
+    
+    # 1. Build the Worker (Go)
+    - docker build -t $CI_REGISTRY_IMAGE/worker:latest .
+    - docker push $CI_REGISTRY_IMAGE/worker:latest
+    
+    # 2. Build the API (Node.js)
+    - docker build -t $CI_REGISTRY_IMAGE/api:latest ./cmd/api
+    - docker push $CI_REGISTRY_IMAGE/api:latest
 
 .aws_auth: &aws_auth
   id_tokens:
