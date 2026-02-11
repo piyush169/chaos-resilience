@@ -74,29 +74,22 @@ deploy_pods:
   dependencies:
     - apply_infra
   script:
-    - apk add --no-cache openssh-client curl
-    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi #load ec2 ip
+    - apk add --no-cache openssh-client
+    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
     
-  
-  
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-    - echo "" >> ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/ #sync manifest to remote server
+    - chmod 600 "$SSH_PRIVATE_KEY"
+    
+    - scp -i "$SSH_PRIVATE_KEY" -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
+    
     - |
-      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "
-        
+      ssh -i "$SSH_PRIVATE_KEY" -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "
         minikube image pull registry.gitlab.com/piyush169/chaos-resilience:latest;
 
-        helm repo add kedacore https://kedacore.github.io/charts;
+        helm repo add kedacore https://kedacore.github.io/charts || true;
         helm repo update;
         helm upgrade --install keda kedacore/keda --namespace keda --create-namespace;
 
-        
         minikube kubectl -- apply -f /home/ubuntu/k8s/;
-
-        # 4. Trigger rolling update
         minikube kubectl -- rollout restart deployment chaos-worker;
       "
     
