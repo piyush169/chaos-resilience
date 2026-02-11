@@ -42,6 +42,11 @@ resource "aws_instance" "chaos_target" {
     depends_on = [aws_security_group.chaos_sg]
     iam_instance_profile = "ChaosWorkerRole"
 
+    root_block_device {
+    volume_size = 20      
+    volume_type = "gp3"  
+  }
+
     tags = {
     Name        = "Chaos-Lab-Instance"
     Environment = "Dev"
