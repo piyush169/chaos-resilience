@@ -86,6 +86,9 @@ deploy_pods:
     
     - |
       ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP " # collapsed multi-line command
+        if ! command -v helm &> /dev/null; then
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;
+        fi
         minikube image pull registry.gitlab.com/piyush169/chaos-resilience:latest;
 
         helm repo add kedacore https://kedacore.github.io/charts || true;
