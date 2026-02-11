@@ -10,6 +10,6 @@ spec:
   triggers:
   - type: redis
     metadata:
-      address: redis-service:6379
+      address: redis-service.default.svc.cluster.local:6379
       listName: chaos_tasks   
       listLength: "5"         
