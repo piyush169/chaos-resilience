@@ -113,7 +113,7 @@ configure_networking:
   image: alpine:latest
   before_script:
     - apk add --update openssh-client
-   - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
+    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
     - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
     - echo "" >> /tmp/id_rsa
