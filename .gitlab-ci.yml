@@ -118,7 +118,7 @@ configure_networking:
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan $EC2_IPADDRESS >> ~/.ssh/known_hosts
   script:
-    script:
+    
     - |
       ssh $SSH_USER@$EC2_IPADDRESS << 'EOF'
         MINIKUBE_IP=$(minikube ip)
