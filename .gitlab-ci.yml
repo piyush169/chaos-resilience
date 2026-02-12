@@ -17,12 +17,15 @@ build_images:
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     
-    # 1. Build the Worker (Go)
-    - docker build -t $CI_REGISTRY_IMAGE/worker:latest .
+    
+    - docker build -t $CI_REGISTRY_IMAGE/base:latest .
+    
+    # Tag and Push as Worker
+    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/worker:latest
     - docker push $CI_REGISTRY_IMAGE/worker:latest
     
-    # 2. Build the API (Node.js)
-    - docker build -t $CI_REGISTRY_IMAGE/api:latest ./cmd/api
+    # Tag and Push as API
+    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/api:latest
     - docker push $CI_REGISTRY_IMAGE/api:latest
 
 .aws_auth: &aws_auth
@@ -105,4 +108,30 @@ deploy_pods:
         minikube kubectl -- rollout restart deployment chaos-worker;
       "
     
-  
+configure_networking:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --update openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan $EC2_IPADDRESS >> ~/.ssh/known_hosts
+  script:
+    script:
+    - |
+      ssh $SSH_USER@$EC2_IPADDRESS << 'EOF'
+        # 1. Forward traffic from Public Port to Minikube
+        MINIKUBE_IP=$(minikube ip)
+        sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
+        sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
+
+        # 2. Install persistence tools without manual prompts
+        echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+        echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+        sudo apt-get update
+        sudo apt-get install -y iptables-persistent
+
+        # 3. Save the active rules to disk
+        sudo netfilter-persistent save
+      EOF

@@ -14,8 +14,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: registry.gitlab.com/piyush169/chaos-resilience:latest 
-        imagePullPolicy: Always
+        image: registry.gitlab.com/piyush169/chaos-resilience/worker:latest 
         command: ["./chaos-worker"] 
         env:
         - name: REDIS_URL

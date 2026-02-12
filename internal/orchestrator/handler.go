@@ -36,7 +36,7 @@ func New(rdb *redis.Client) *Orchestrator {
 
 func (o *Orchestrator) HandleChaos(c *gin.Context) {
 	var req struct {
-		Action    string `json:"action"` //start or stop
+		Action    string `json:"action"`
 		LatencyMS int    `json:"latency_ms"`
 	}
 
