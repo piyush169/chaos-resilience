@@ -113,14 +113,17 @@ configure_networking:
   image: alpine:latest
   before_script:
     - apk add --update openssh-client
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan $EC2_IPADDRESS >> ~/.ssh/known_hosts
+   - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
+    - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
+    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
+    - echo "" >> /tmp/id_rsa
+    - chmod 400 /tmp/id_rsa
+    
+    
+    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
   script:
-    script:
     - |
-      ssh $SSH_USER@$EC2_IPADDRESS << 'EOF'
+      ssh $SSH_USER@$EC2_PUBLIC_IP << 'EOF'
         MINIKUBE_IP=$(minikube ip)
         # Port forwarding commands here
         sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
