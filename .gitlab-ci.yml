@@ -52,6 +52,7 @@ plan_infra:
     - cd infra
     - gitlab-terraform init
     - gitlab-terraform plan
+    - gitlab-terraform plan-json > plan.json
   artifacts:
     paths:
       - infra/plan.cache
@@ -110,28 +111,31 @@ deploy_pods:
     
 configure_networking:
   stage: deploy
-  image: alpine:latest
+  # This ensures it waits for apply_infra to finish and gives you the IP
+  needs:
+    - job: apply_infra
+      artifacts: true
   before_script:
     - apk add --update openssh-client
-    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
+    # Removed the manual 'grep' export line; dotenv handles it now.
     - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!"; exit 1; fi
     - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
     - echo "" >> /tmp/id_rsa
     - chmod 400 /tmp/id_rsa
-    
-    
-    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
   script:
+    - echo "DEBUG: Successfully captured EC2 IP as [$EC2_PUBLIC_IP]"
+    # First, copy your K8s manifests to the EC2
+    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
+    # Then, run the networking bridge commands
     - |
-      ssh $SSH_USER@$EC2_PUBLIC_IP << 'EOF'
+      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         MINIKUBE_IP=$(minikube ip)
-        # Port forwarding commands here
+        # Port forwarding for Lambda -> Redis
         sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
         sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
         
-        # Persistence tools
+        # Make rules persistent
         echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
-        sudo apt-get update
-        sudo apt-get install -y iptables-persistent
+        sudo apt-get update && sudo apt-get install -y iptables-persistent
         sudo netfilter-persistent save
       EOF
