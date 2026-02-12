@@ -123,7 +123,6 @@ configure_networking:
     - echo "" >> /tmp/id_rsa
     - chmod 400 /tmp/id_rsa
   script:
-    - echo "DEBUG: Successfully captured EC2 IP as [$EC2_PUBLIC_IP]"
     # First, copy your K8s manifests to the EC2
     - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     # Then, run the networking bridge commands
