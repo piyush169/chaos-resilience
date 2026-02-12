@@ -121,17 +121,14 @@ configure_networking:
     script:
     - |
       ssh $SSH_USER@$EC2_IPADDRESS << 'EOF'
-        # 1. Forward traffic from Public Port to Minikube
         MINIKUBE_IP=$(minikube ip)
+        # Port forwarding commands here
         sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
         sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
-
-        # 2. Install persistence tools without manual prompts
+        
+        # Persistence tools
         echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
-        echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
         sudo apt-get update
         sudo apt-get install -y iptables-persistent
-
-        # 3. Save the active rules to disk
         sudo netfilter-persistent save
       EOF
