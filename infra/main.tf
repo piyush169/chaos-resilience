@@ -6,34 +6,43 @@ variable "public_key" {
   type        = string
 }
 
-//security group for api
 resource "aws_security_group" "chaos_sg" {
     name = "chaos-sg-${terraform.workspace}"
+
+    
+    ingress {
+        from_port   = 22
+        to_port     = 22
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    ingress {
+        from_port   = 8080
+        to_port     = 8080
+        protocol    = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
     egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
+        from_port   = 0
+        to_port     = 0
+        protocol    = "-1"
         cidr_blocks = ["0.0.0.0/0"]
     }
 }
 
-resource "aws_security_group_rule" "ssh" {
+# Keep this separate so you can easily toggle it later
+resource "aws_security_group_rule" "lambda_to_redis_bridge" {
   type              = "ingress"
-  from_port         = 22
-  to_port           = 22
+  from_port         = 31379
+  to_port           = 31379
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.chaos_sg.id
+  description       = "Allows Lambda to trigger chaos by pushing to Redis"
 }
 
-resource "aws_security_group_rule" "api" {
-  type              = "ingress"
-  from_port         = 8080
-  to_port           = 8080
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.chaos_sg.id
-}
 resource "aws_key_pair" "chaos_deployer" {
   key_name   = "chaos-keypair"
   public_key = var.public_key

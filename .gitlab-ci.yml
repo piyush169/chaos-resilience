@@ -5,29 +5,11 @@ stages:
   - k8s_deploy
 
 variables:
-  DOCKER_IMAGE: $CI_REGISTRY_IMAGE:latest
   AWS_ROLE_ARN: arn:aws:iam::510674263883:role/GitLabPipelineRole
   AWS_REGION: ap-south-1
 
-build_images:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-
-    - docker build -t $CI_REGISTRY_IMAGE/base:latest .
-
-    # Tag and Push as Worker
-    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/worker:latest
-    - docker push $CI_REGISTRY_IMAGE/worker:latest
-
-    # Tag and Push as API
-    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/api:latest
-    - docker push $CI_REGISTRY_IMAGE/api:latest
-
-.aws_auth:
+# Standardizes AWS OIDC Auth for all Terraform jobs
+.aws_auth: &aws_auth
   id_tokens:
     GITLAB_OIDC_TOKEN:
       aud: https://gitlab.com
@@ -40,19 +22,21 @@ build_images:
     - echo "${GITLAB_OIDC_TOKEN}" > /tmp/web_identity_token
     - export AWS_CONFIG_FILE=~/.aws/config
 
+build_images:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE/base:latest .
+    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/worker:latest
+    - docker push $CI_REGISTRY_IMAGE/worker:latest
+    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/api:latest
+    - docker push $CI_REGISTRY_IMAGE/api:latest
+
 plan_infra:
-  <<:
-    id_tokens:
-      GITLAB_OIDC_TOKEN:
-        aud: https://gitlab.com
-    before_script:
-      - mkdir -p ~/.aws
-      - |
-        echo "[default]
-        role_arn = ${AWS_ROLE_ARN}
-        web_identity_token_file = /tmp/web_identity_token" > ~/.aws/config
-      - echo "${GITLAB_OIDC_TOKEN}" > /tmp/web_identity_token
-      - export AWS_CONFIG_FILE=~/.aws/config
+  <<: *aws_auth
   stage: plan
   image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
@@ -61,79 +45,26 @@ plan_infra:
     - cd infra
     - gitlab-terraform init
     - gitlab-terraform plan
-    - gitlab-terraform plan-json > plan.json
   artifacts:
     paths:
       - infra/plan.cache
 
 apply_infra:
-  <<:
-    id_tokens:
-      GITLAB_OIDC_TOKEN:
-        aud: https://gitlab.com
-    before_script:
-      - mkdir -p ~/.aws
-      - |
-        echo "[default]
-        role_arn = ${AWS_ROLE_ARN}
-        web_identity_token_file = /tmp/web_identity_token" > ~/.aws/config
-      - echo "${GITLAB_OIDC_TOKEN}" > /tmp/web_identity_token
-      - export AWS_CONFIG_FILE=~/.aws/config
+  <<: *aws_auth
   stage: deploy
   image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
   variables:
     TF_STATE_NAME: chaos-prod
+  dependencies:
+    - plan_infra
   script:
     - cd infra
     - gitlab-terraform init
-    - aws ec2 revoke-security-group-ingress --group-id sg-01bae2a4aaa434d33
-      --security-group-rule-ids sgr-0c019b96d9323b289 sgr-0dbf5e72b67591db6 ||
-      true
     - gitlab-terraform apply
-    - export
-      TF_HTTP_ADDRESS="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/${TF_STATE_NAME}"
-    - export TF_HTTP_USERNAME="gitlab-ci-token"
-    - export TF_HTTP_PASSWORD="${CI_JOB_TOKEN}"
-    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >
-      ${CI_PROJECT_DIR}/deploy.env
-    - cat ${CI_PROJECT_DIR}/deploy.env
+    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > ../deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
-  dependencies:
-    - plan_infra
-
-deploy_pods:
-  stage: k8s_deploy
-  image: alpine:latest
-  dependencies:
-    - apply_infra
-  script:
-    - apk add --no-cache openssh-client
-    - if [ -f deploy.env ]; then export $(grep -v '^#' deploy.env | xargs); fi
-    - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!";
-      exit 1; fi
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
-    - echo "" >> /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
-
-    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/
-      ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
-
-    - |
-      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP " # collapsed multi-line command
-        if ! command -v helm &> /dev/null; then
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;
-        fi
-        minikube image pull registry.gitlab.com/piyush169/chaos-resilience:latest;
-
-        helm repo add kedacore https://kedacore.github.io/charts || true;
-        helm repo update;
-        helm upgrade --install keda kedacore/keda --namespace keda --create-namespace;
-
-        minikube kubectl -- apply -f /home/ubuntu/k8s/;
-        minikube kubectl -- rollout restart deployment chaos-worker;
-      "
 
 configure_networking:
   stage: deploy
@@ -143,25 +74,42 @@ configure_networking:
       artifacts: true
   before_script:
     - apk add --update openssh-client
-    # Removed the manual 'grep' export line; dotenv handles it now.
-    - if [ -z "$SSH_PRIVATE_KEY" ]; then echo "SSH_PRIVATE_KEY is missing!";
-      exit 1; fi
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
-    - echo "" >> /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa && chmod 400 /tmp/id_rsa
   script:
-    # First, copy your K8s manifests to the EC2
-    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/
-      ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
       ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         MINIKUBE_IP=$(minikube ip)
-        # Port forwarding for Lambda -> Redis
-        sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
-        sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
-
-        # Make rules persistent
-        echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
-        sudo apt-get update && sudo apt-get install -y iptables-persistent
+        sudo iptables -t nat -C PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379 2>/dev/null || \
+          sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
+        sudo iptables -C FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT 2>/dev/null || \
+          sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
+        if ! dpkg -l | grep -q iptables-persistent; then
+          echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+          sudo apt-get update && sudo apt-get install -y iptables-persistent
+        fi
         sudo netfilter-persistent save
+      EOF
+
+deploy_pods:
+  stage: k8s_deploy
+  image: alpine:latest
+  needs:
+    - job: apply_infra
+      artifacts: true
+    - job: configure_networking
+  before_script:
+    - apk add --update openssh-client
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa && chmod 400 /tmp/id_rsa
+  script:
+    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
+    - |
+      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        if ! command -v helm &> /dev/null; then
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        fi
+        helm repo add kedacore https://kedacore.github.io/charts || true
+        helm repo update
+        helm upgrade --install keda kedacore/keda --namespace keda --create-namespace
+        minikube kubectl -- apply -f /home/ubuntu/k8s/
+        minikube kubectl -- rollout restart deployment chaos-worker
       EOF
