@@ -74,8 +74,9 @@ configure_networking:
       artifacts: true
   before_script:
     - apk add --update openssh-client
-    - chmod 400 "$SSH_PRIVATE_KEY" # GitLab already created the file for you!
-    - echo "Captured IP $EC2_PUBLIC_IP"
+    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
+    - echo "" >> /tmp/id_rsa
+    - chmod 400 /tmp/id_rsa
   script:
     - if [ -z "$EC2_PUBLIC_IP" ]; then echo "IP capture failed!"; exit 1; fi
     - |
