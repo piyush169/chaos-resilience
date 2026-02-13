@@ -111,7 +111,7 @@ deploy_pods:
     
 configure_networking:
   stage: deploy
-  # This ensures it waits for apply_infra to finish and gives you the IP
+  image: alpine:latest
   needs:
     - job: apply_infra
       artifacts: true
