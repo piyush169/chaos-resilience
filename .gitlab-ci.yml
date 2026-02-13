@@ -74,7 +74,12 @@ configure_networking:
       artifacts: true
   before_script:
     - apk add --update openssh-client
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa && chmod 400 /tmp/id_rsa
+    - printf "%s\n" "$SSH_PRIVATE_KEY" > /tmp/id_rsa
+    # Remove Windows-style carriage returns if they exist
+    - sed -i 's/\r$//' /tmp/id_rsa
+    - chmod 400 /tmp/id_rsa
+    # Quick check: The file should start with '-----'
+    - head -n 1 /tmp/id_rsa
   script:
     - echo "Captured IP $EC2_PUBLIC_IP"
     - if [ -z "$EC2_PUBLIC_IP" ]; then echo "IP capture failed!"; exit 1; fi
