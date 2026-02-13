@@ -76,6 +76,8 @@ configure_networking:
     - apk add --update openssh-client
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa && chmod 400 /tmp/id_rsa
   script:
+    - echo "Captured IP $EC2_PUBLIC_IP"
+    - if [ -z "$EC2_PUBLIC_IP" ]; then echo "IP capture failed!"; exit 1; fi
     - |
       ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         MINIKUBE_IP=$(minikube ip)
