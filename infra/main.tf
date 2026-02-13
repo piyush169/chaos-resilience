@@ -82,12 +82,3 @@ resource "aws_instance" "chaos_target" {
   
 }
 
-resource "aws_security_group_rule" "lambda_to_redis_bridge" {
-  type              = "ingress"
-  from_port         = 31379
-  to_port           = 31379
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"] # For demo; in prod, use specific Lambda IP ranges
-  security_group_id = aws_security_group.chaos_sg.id
-  description       = "Allows Lambda to trigger chaos by pushing to Redis"
-}
