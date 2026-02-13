@@ -74,14 +74,9 @@ configure_networking:
       artifacts: true
   before_script:
     - apk add --update openssh-client
-    - printf "%s\n" "$SSH_PRIVATE_KEY" > /tmp/id_rsa
-    # Remove Windows-style carriage returns if they exist
-    - sed -i 's/\r$//' /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
-    # Quick check: The file should start with '-----'
-    - head -n 1 /tmp/id_rsa
-  script:
+    - chmod 400 "$SSH_PRIVATE_KEY" # GitLab already created the file for you!
     - echo "Captured IP $EC2_PUBLIC_IP"
+  script:
     - if [ -z "$EC2_PUBLIC_IP" ]; then echo "IP capture failed!"; exit 1; fi
     - |
       ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
@@ -106,12 +101,8 @@ deploy_pods:
     - job: configure_networking
   before_script:
     - apk add --update openssh-client
-    - printf "%s\n" "$SSH_PRIVATE_KEY" > /tmp/id_rsa
-    # Remove Windows-style carriage returns if they exist
-    - sed -i 's/\r$//' /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
-    # Quick check: The file should start with '-----'
-    - head -n 1 /tmp/id_rsa
+    - chmod 400 "$SSH_PRIVATE_KEY" # GitLab already created the file for you!
+    - echo "Captured IP $EC2_PUBLIC_IP"
   script:
     - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
