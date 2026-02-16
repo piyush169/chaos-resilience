@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus 
+spec:
+  selector:
+    matchLabels:
+      app: redis 
+  endpoints:
+  - port: redis-port
+    interval: 5s # High-frequency scraping for chaos tracking

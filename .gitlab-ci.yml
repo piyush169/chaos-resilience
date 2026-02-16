@@ -3,6 +3,7 @@ stages:
   - plan
   - deploy
   - k8s_deploy
+  - observe
 
 variables:
   AWS_ROLE_ARN: arn:aws:iam::510674263883:role/GitLabPipelineRole
@@ -82,10 +83,20 @@ configure_networking:
     - |
       ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         MINIKUBE_IP=$(minikube ip)
+        
+        
+        sudo iptables -P FORWARD ACCEPT
+        
+        
         sudo iptables -t nat -C PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379 2>/dev/null || \
           sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
-        sudo iptables -C FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT 2>/dev/null || \
-          sudo iptables -A FORWARD -p tcp -d $MINIKUBE_IP --dport 31379 -j ACCEPT
+        
+        # FORWARD rules (add at top of chain)
+        sudo iptables -C FORWARD -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT 2>/dev/null || \
+          sudo iptables -I FORWARD 1 -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT
+        sudo iptables -C FORWARD -s $MINIKUBE_IP -p tcp --sport 31379 -j ACCEPT 2>/dev/null || \
+          sudo iptables -I FORWARD 1 -s $MINIKUBE_IP -p tcp --sport 31379 -j ACCEPT
+        
         if ! dpkg -l | grep -q iptables-persistent; then
           echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
           sudo apt-get update && sudo apt-get install -y iptables-persistent
@@ -118,4 +129,36 @@ deploy_pods:
         helm upgrade --install keda kedacore/keda --namespace keda --create-namespace
         minikube kubectl -- apply -f /home/ubuntu/k8s/
         minikube kubectl -- rollout restart deployment chaos-worker
+      EOF
+
+observe_clusted:
+  stage: observe
+  image: alpine:latest
+  needs:
+    - job: apply_infra
+      artifacts: true
+    - job: deploy_pods
+  before_script:
+    - apk add --update openssh-client
+    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
+    - echo "" >> /tmp/id_rsa
+    - chmod 400 /tmp/id_rsa
+
+  script:
+    - |
+      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
+        
+        
+        helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+          --namespace monitoring --create-namespace \
+          --set grafana.adminPassword=admin
+        
+        
+        minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
+        
+        
+        minikube kubectl -- rollout status deployment/prometheus-grafana -n monitoring
       EOF
