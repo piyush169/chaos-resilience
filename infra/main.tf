@@ -32,7 +32,7 @@ resource "aws_security_group" "chaos_sg" {
     }
 }
 
-# Keep this separate so you can easily toggle it later
+
 resource "aws_security_group_rule" "lambda_to_redis_bridge" {
   type              = "ingress"
   from_port         = 31379
