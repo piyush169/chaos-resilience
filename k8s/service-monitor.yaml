@@ -8,7 +8,8 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: redis 
+      app.kubernetes.io/name: prometheus-redis-exporter
+      app.kubernetes.io/instance: redis-exporter
   endpoints:
-  - port: redis-port
+  - port: 9121
     interval: 5s # High-frequency scraping for chaos tracking
