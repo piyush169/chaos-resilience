@@ -8,132 +8,101 @@ stages:
 variables:
   AWS_ROLE_ARN: arn:aws:iam::510674263883:role/GitLabPipelineRole
   AWS_REGION: ap-south-1
+  LOCAL_TAG: "local-macos"
 
-# Standardizes AWS OIDC Auth for all Terraform jobs
-.aws_auth: &aws_auth
-  id_tokens:
-    GITLAB_OIDC_TOKEN:
-      aud: https://gitlab.com
-  before_script:
-    - mkdir -p ~/.aws
-    - |
-      echo "[default]
-      role_arn = ${AWS_ROLE_ARN}
-      web_identity_token_file = /tmp/web_identity_token" > ~/.aws/config
-    - echo "${GITLAB_OIDC_TOKEN}" > /tmp/web_identity_token
-    - export AWS_CONFIG_FILE=~/.aws/config
+
 
 build_images:
   stage: build
+  tags:
+    - local-macos
   image: docker:latest
-  services:
-    - docker:dind
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $CI_REGISTRY_IMAGE/base:latest .
-    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/worker:latest
+    - docker build -t $CI_REGISTRY_IMAGE/worker:latest .
     - docker push $CI_REGISTRY_IMAGE/worker:latest
-    - docker tag $CI_REGISTRY_IMAGE/base:latest $CI_REGISTRY_IMAGE/api:latest
-    - docker push $CI_REGISTRY_IMAGE/api:latest
 
 plan_infra:
-  <<: *aws_auth
   stage: plan
-  image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
-  variables:
-    TF_STATE_NAME: chaos-prod
+  tags:
+    - local-macos
   script:
     - cd infra
-    - gitlab-terraform init
-    - gitlab-terraform plan
-  artifacts:
-    paths:
-      - infra/plan.cache
+    - terraform init -reconfigure
+    - terraform plan -out=plan.cache
 
 apply_infra:
-  <<: *aws_auth
   stage: deploy
-  image: registry.gitlab.com/gitlab-org/terraform-images/stable:latest
-  variables:
-    TF_STATE_NAME: chaos-prod
-  dependencies:
-    - plan_infra
+  tags:
+    - local-macos
   script:
     - cd infra
-    - gitlab-terraform init   
-    - gitlab-terraform state rm aws_key_pair.chaos_deployer || true
-    - gitlab-terraform apply
-    - echo "EC2_PUBLIC_IP=$(gitlab-terraform output -raw ec2_public_ip)" > ../deploy.env
+    - |
+      CREDENTIALS=$(aws sts assume-role \
+        --role-arn "arn:aws:iam::510674263883:role/GitLabPipelineRole" \
+        --role-session-name "GitLabLocalRunner" \
+        --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
+        --output text)
+    - export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | cut -d' ' -f1)
+    - export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | cut -d' ' -f2)
+    - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | cut -d' ' -f3)
+    
+    
+    - terraform init -reconfigure
+    - terraform apply -auto-approve plan.cache
+    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > ../deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
 
 configure_networking:
   stage: deploy
+  tags:
+    - local-macos
   image: alpine:latest
-  needs:
-    - job: apply_infra
-      artifacts: true
+  needs: [apply_infra]
   before_script:
     - apk add --update openssh-client
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
-    - echo "" >> /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
   script:
-    - if [ -z "$EC2_PUBLIC_IP" ]; then echo "IP capture failed!"; exit 1; fi
+    
     - |
-      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        echo "Waiting for EC2 boot script (cloud-init) to finish..."
+        until [ -f /var/lib/cloud/instance/boot-finished ]; do
+          sleep 5
+          echo -n "."
+        done
+        echo "Ready!"
+        
         MINIKUBE_IP=$(minikube ip)
+        sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
+        sudo iptables -I FORWARD 1 -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT
         
-        
-        sudo iptables -P FORWARD ACCEPT
-        
-        
-        sudo iptables -t nat -C PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379 2>/dev/null || \
-          sudo iptables -t nat -A PREROUTING -p tcp --dport 31379 -j DNAT --to-destination $MINIKUBE_IP:31379
-        
-        # FORWARD rules (add at top of chain)
-        sudo iptables -C FORWARD -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT 2>/dev/null || \
-          sudo iptables -I FORWARD 1 -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT
-        sudo iptables -C FORWARD -s $MINIKUBE_IP -p tcp --sport 31379 -j ACCEPT 2>/dev/null || \
-          sudo iptables -I FORWARD 1 -s $MINIKUBE_IP -p tcp --sport 31379 -j ACCEPT
-        
-        if ! dpkg -l | grep -q iptables-persistent; then
-          echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
-          sudo apt-get update && sudo apt-get install -y iptables-persistent
-        fi
+        sudo apt-get update && sudo apt-get install -y iptables-persistent
         sudo netfilter-persistent save
       EOF
 
 deploy_pods:
   stage: k8s_deploy
-  image: alpine:latest
-  needs:
-    - job: apply_infra
-      artifacts: true
-    - job: configure_networking
-  before_script:
-    - apk add --update openssh-client
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
-    - echo "" >> /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
-
+  tags:
+    - local-macos
+  needs: [apply_infra, configure_networking]
   script:
-    - scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
+    - scp -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
-      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
-        if ! command -v helm &> /dev/null; then
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-        fi
-        helm repo add kedacore https://kedacore.github.io/charts || true
-        helm repo update
-        helm upgrade --install keda kedacore/keda --namespace keda --create-namespace
-        minikube kubectl -- apply -f /home/ubuntu/k8s/
-        minikube kubectl -- rollout restart deployment chaos-worker
+      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        helm upgrade --install redis-exporter prometheus-community/prometheus-redis-exporter \
+          --set redisAddress=redis-service.default.svc.cluster.local:6379
+        
+        # Apply your ServiceMonitor and Dashboard ConfigMap so they don't vanish on restart
+        minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
+        minikube kubectl -- apply -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml
       EOF
 
 observe_cluster:
   stage: observe
+  tags:
+    - local-macos
   image: alpine:latest
   needs:
     - job: apply_infra
