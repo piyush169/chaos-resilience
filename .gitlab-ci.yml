@@ -63,8 +63,6 @@ configure_networking:
   tags:
     - local-macos
   needs: [apply_infra]
-  before_script:
-    - apk add --update openssh-client
   script:
     - |
       ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
