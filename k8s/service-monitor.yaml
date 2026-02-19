@@ -11,5 +11,5 @@ spec:
       app.kubernetes.io/name: prometheus-redis-exporter
       app.kubernetes.io/instance: redis-exporter
   endpoints:
-  - port: 9121
+  - port: redis_exporter
     interval: 5s # High-frequency scraping for chaos tracking
