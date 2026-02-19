@@ -8,6 +8,7 @@ stages:
 variables:
   AWS_ROLE_ARN: arn:aws:iam::510674263883:role/GitLabPipelineRole
   AWS_REGION: ap-south-1
+  DOCKER_HOST: unix:///var/run/docker.sock
   LOCAL_TAG: "local-macos"
 
 
