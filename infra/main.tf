@@ -85,6 +85,7 @@ resource "aws_instance" "chaos_target" {
     ami          = "ami-0b6c6ebed2801a5cb" 
     instance_type = "m7i-flex.large"
     key_name   = aws_key_pair.chaos_deployer.key_name
+    subnet_id     = aws_subnet.chaos_subnet.id  
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
     depends_on = [aws_security_group.chaos_sg]
     iam_instance_profile = "ChaosWorkerRole"
