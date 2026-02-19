@@ -38,15 +38,16 @@ resource "aws_route_table_association" "chaos_rta" {
 }
 
 resource "aws_security_group" "chaos_sg" {
-    name = "chaos-sg-${terraform.workspace}"
+  name        = "chaos-sg-default"
+  description = "Allow inbound traffic for chaos lab"
+  vpc_id      = aws_vpc.chaos_vpc.id  
 
-    
-    ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
     ingress {
         from_port   = 8080
