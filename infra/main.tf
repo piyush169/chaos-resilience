@@ -77,6 +77,7 @@ resource "aws_instance" "chaos_target" {
                 sudo install minikube-linux-amd64 /usr/local/bin/minikube
                 sudo -u ubuntu minikube start --driver=docker
                 sudo mkdir -p /home/ubuntu/k8s
+                sudo chown ubuntu:ubuntu /home/ubuntu/k8s
                 sudo minikube mount /home/ubuntu/k8s:/k8s &
             EOF
   
