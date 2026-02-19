@@ -50,7 +50,7 @@ resource "aws_key_pair" "chaos_deployer" {
 
 //
 resource "aws_instance" "chaos_target" {
-    ami          = "ami-019715e0d74f695be" 
+    ami          = "ami-0b6c6ebed2801a5cb" 
     instance_type = "m7i-flex.large"
     key_name   = aws_key_pair.chaos_deployer.key_name
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
