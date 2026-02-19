@@ -131,7 +131,7 @@ deploy_pods:
         minikube kubectl -- rollout restart deployment chaos-worker
       EOF
 
-observe_clusted:
+observe_cluster:
   stage: observe
   image: alpine:latest
   needs:
