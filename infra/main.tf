@@ -1,5 +1,5 @@
 provider "aws" {
-    region = "ap-south-1"
+    region = "us-east-1"
 }
 variable "public_key" {
   description = "The public SSH key for the EC2 instance"
@@ -59,7 +59,7 @@ resource "aws_instance" "chaos_target" {
 
     root_block_device {
     volume_size = 20      
-    volume_type = "gp3"  
+    volume_type = "gp3" 
   }
 
     tags = {

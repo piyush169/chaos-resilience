@@ -7,6 +7,8 @@ metadata:
     release: prometheus 
 spec:
   selector:
+    matchNames:
+      - default: redis-service
     matchLabels:
       app.kubernetes.io/name: prometheus-redis-exporter
       app.kubernetes.io/instance: redis-exporter
