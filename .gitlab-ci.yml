@@ -60,10 +60,7 @@ apply_infra:
     - plan_infra
   script:
     - cd infra
-    -  gitlab-terraform init
-    - gitlab-terraform state rm aws_security_group.chaos_sg
-    - gitlab-terraform state rm aws_instance.chaos_target
-    
+    -  gitlab-terraform init   
     - gitlab-terraform apply
     - echo "EC2_PUBLIC_IP=$(gitlab-terraform output -raw ec2_public_ip)" > ../deploy.env
   artifacts:
