@@ -78,6 +78,7 @@ configure_networking:
         sudo iptables -I FORWARD 1 -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT
         
         sudo apt-get update && sudo apt-get install -y iptables-persistent
+        
         sudo netfilter-persistent save
       EOF
 
