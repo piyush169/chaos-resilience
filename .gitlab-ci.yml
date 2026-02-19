@@ -30,6 +30,9 @@ plan_infra:
     - cd infra
     - terraform init -reconfigure
     - terraform plan -out=plan.cache
+  artifacts:
+    paths:
+      - infra/plan.cache
 
 apply_infra:
   stage: deploy
