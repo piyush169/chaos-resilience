@@ -59,14 +59,12 @@ configure_networking:
   stage: deploy
   tags:
     - local-macos
-  image: alpine:latest
   needs: [apply_infra]
   before_script:
     - apk add --update openssh-client
   script:
-    
     - |
-        ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         echo "Waiting for EC2 boot script (cloud-init) to finish..."
         until [ -f /var/lib/cloud/instance/boot-finished ]; do
           sleep 5
@@ -88,15 +86,12 @@ deploy_pods:
     - local-macos
   needs: [apply_infra, configure_networking]
   script:
+    - ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "sudo chown -R ubuntu:ubuntu /home/ubuntu/k8s"
     - scp -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
       ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
-        helm upgrade --install redis-exporter prometheus-community/prometheus-redis-exporter \
-          --set redisAddress=redis-service.default.svc.cluster.local:6379
-        
-        # Apply your ServiceMonitor and Dashboard ConfigMap so they don't vanish on restart
-        minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
-        minikube kubectl -- apply -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml
+        minikube kubectl -- apply -f /home/ubuntu/k8s/
+        minikube kubectl -- rollout restart deployment chaos-worker
       EOF
 
 observe_cluster:
@@ -108,27 +103,13 @@ observe_cluster:
     - job: apply_infra
       artifacts: true
     - job: deploy_pods
-  before_script:
-    - apk add --update openssh-client
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > /tmp/id_rsa
-    - echo "" >> /tmp/id_rsa
-    - chmod 400 /tmp/id_rsa
-
   script:
     - |
-      ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        helm upgrade --install redis-exporter prometheus-community/prometheus-redis-exporter \
+          --set redisAddress=redis-service.default.svc.cluster.local:6379
         
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-        helm repo update
-        
-        
-        helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
-          --namespace monitoring --create-namespace \
-          --set grafana.adminPassword=admin
-        
-        
+        # Apply your ServiceMonitor and Dashboard ConfigMap so they don't vanish on restart
         minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
-        
-        
-        minikube kubectl -- rollout status deployment/prometheus-grafana -n monitoring
+        minikube kubectl -- apply -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml
       EOF
