@@ -65,7 +65,7 @@ configure_networking:
   needs: [apply_infra]
   script:
     - |
-      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         echo "Waiting for EC2 boot script (cloud-init) to finish..."
         until [ -f /var/lib/cloud/instance/boot-finished ]; do
           sleep 5
@@ -78,7 +78,7 @@ configure_networking:
         sudo iptables -I FORWARD 1 -d $MINIKUBE_IP -p tcp --dport 31379 -j ACCEPT
         
         sudo apt-get update && sudo apt-get install -y iptables-persistent
-        
+
         sudo netfilter-persistent save
       EOF
 
