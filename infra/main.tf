@@ -89,7 +89,7 @@ resource "aws_instance" "chaos_target" {
     subnet_id     = aws_subnet.chaos_subnet.id  
     vpc_security_group_ids = [aws_security_group.chaos_sg.id]
     depends_on = [aws_security_group.chaos_sg]
-    iam_instance_profile = "ChaosWorkerRole"
+    iam_instance_profile = aws_iam_instance_profile.chaos_worker.name
 
     root_block_device {
     volume_size = 20      
