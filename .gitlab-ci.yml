@@ -24,7 +24,7 @@ sync-to-github:
   variables:
     GIT_STRATEGY: clone
   script:
-    - git remote add github https://github.com/piyush169/chaos-resilience.git
+    - git remote add github https://piyush169:${GITHUB_PAT}@github.com/piyush169/chaos-resilience.git || true
     - git push github HEAD:main --force
     - git push github --tags
   only:
