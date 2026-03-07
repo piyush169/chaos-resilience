@@ -63,13 +63,11 @@ func (o *Orchestrator) HandleChaos(c *gin.Context) {
 }
 
 func (o *Orchestrator) GetClusterStatus(c *gin.Context) {
-
-	queueLag, err := o.rdb.LLen(c.Request.Context(), "chaos_tasks").Result()
+	// Use XLEN to get the number of entries in the stream
+	streamLen, err := o.rdb.XLen(c.Request.Context(), "control_stream").Result()
 	if err != nil {
-		queueLag = 0 // Fallback if Redis is empty
+		streamLen = 0
 	}
-
-	// 2. Fetch running pods from K8s API
 
 	pods, err := o.k8sClient.CoreV1().Pods("default").List(c.Request.Context(), metav1.ListOptions{
 		LabelSelector: "app=worker",
@@ -84,9 +82,11 @@ func (o *Orchestrator) GetClusterStatus(c *gin.Context) {
 		}
 	}
 
-	// 3. Determine status based on thresholds
+	// Determine status — check both conditions independently
 	status := "healthy"
-	if queueLag > 20 {
+	if streamLen > 20 && runningCount > 5 {
+		status = "under_pressure_scaling"
+	} else if streamLen > 20 {
 		status = "under_pressure"
 	} else if runningCount > 5 {
 		status = "scaling"
@@ -94,7 +94,7 @@ func (o *Orchestrator) GetClusterStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"pods_running": runningCount,
-		"queue_lag":    queueLag,
+		"queue_lag":    streamLen,
 		"status":       status,
 	})
 }

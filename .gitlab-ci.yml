@@ -7,7 +7,7 @@ stages:
 
 variables:
   AWS_ROLE_ARN: arn:aws:iam::510674263883:role/GitLabPipelineRole
-  AWS_REGION: ap-south-1
+  AWS_REGION: us-east-1
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
 
@@ -29,8 +29,6 @@ build_images:
 
 plan_infra:
   stage: plan
-  tags:
-    - local-macos
   script:
     - cd infra
     - terraform init -reconfigure
@@ -41,8 +39,6 @@ plan_infra:
 
 apply_infra:
   stage: deploy
-  tags:
-    - local-macos
   script:
     - cd infra
     - |
@@ -57,16 +53,24 @@ apply_infra:
     
     
     - terraform init -reconfigure
-    - terraform apply -auto-approve
+    - terraform apply -auto-approve plan.cache
     - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > ../deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
 
+.infra_job:
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client terraform aws-cli
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+  
+
 configure_networking:
+  extends: .infra_job
   stage: deploy
-  tags:
-    - local-macos
   needs: [apply_infra]
   script:
     - |
@@ -88,24 +92,21 @@ configure_networking:
       EOF
 
 deploy_pods:
+  extends: .infra_job
   stage: k8s_deploy
-  tags:
-    - local-macos
   needs: [apply_infra, configure_networking]
   script:
-    - ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "sudo chown -R ubuntu:ubuntu /home/ubuntu/k8s"
-    - scp -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
+    - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "sudo chown -R ubuntu:ubuntu /home/ubuntu/k8s"
+    - scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
-      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         minikube kubectl -- apply -f /home/ubuntu/k8s/
         minikube kubectl -- rollout restart deployment chaos-worker
       EOF
 
 observe_cluster:
   stage: observe
-  tags:
-    - local-macos
-  image: alpine:latest
+  extends: .infra_job
   needs:
     - job: apply_infra
       artifacts: true

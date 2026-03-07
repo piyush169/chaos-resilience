@@ -39,16 +39,29 @@ func (w *Worker) Start(ctx context.Context) {
 
 func (w *Worker) checkChaos(ctx context.Context) {
 	// Read from Redis Stream
-	msgs, _ := w.rdb.XRead(ctx, &redis.XReadArgs{
+	msgs, err := w.rdb.XRead(ctx, &redis.XReadArgs{
 		Streams: []string{"control_stream", "0"},
 		Count:   1,
 		Block:   100 * time.Millisecond,
 	}).Result()
 
+	if err != nil && err != redis.Nil {
+		log.Printf("ERROR] Failed to read from Redis stream: %v", err)
+		return
+	}
+
 	for _, stream := range msgs {
 		for _, msg := range stream.Messages {
-			action := msg.Values["action"].(string)
-			latencyMS := msg.Values["latency_ms"].(string)
+			action, ok := msg.Values["action"].(string)
+			if !ok {
+				log.Printf("[WARN] Skipping message %s: missing or invalid 'action'", msg.ID)
+				continue
+			}
+			latencyMS, ok := msg.Values["latency_ms"].(string)
+			if !ok {
+				log.Printf("[WARN] Skipping message %s: missing or invalid 'latency_ms'", msg.ID)
+				continue
+			}
 
 			if action == "start" {
 				w.injectLatency(latencyMS)
