@@ -59,23 +59,22 @@ apply_infra:
     name: hashicorp/terraform:latest
     entrypoint: [""]
   needs: 
-    - job: [plan_infra]
+    - job: plan_infra
       artifacts: true
   script:
-    - cd infra
-    - apk add --no-cache aws-cli
-   - |
-      CREDENTIALS=$(aws sts assume-role \
-        --role-arn "arn:aws:iam::510674263883:role/GitLabPipelineRole" \
-        --role-session-name "GitLabLocalRunner" \
-        --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
-        --output text)
-    - export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | cut -d' ' -f1)
-    - export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | cut -d' ' -f2)
-    - export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | cut -d' ' -f3)
-    - terraform init -reconfigure
-    - terraform apply -auto-approve plan.cache
-    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > ../deploy.env
+      - cd infra
+      - apk add --no-cache aws-cli
+      - |
+        CREDENTIALS=$(aws sts assume-role \
+          --role-arn "$AWS_ROLE_ARN" \
+          --role-session-name "GitLabLocalRunner" \
+          --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" \
+          --output text)
+        export AWS_ACCESS_KEY_ID=$(echo "$CREDENTIALS" | awk '{print $1}')
+        export AWS_SECRET_ACCESS_KEY=$(echo "$CREDENTIALS" | awk '{print $2}')
+        export AWS_SESSION_TOKEN=$(echo "$CREDENTIALS" | awk '{print $3}')
+      - terraform init -reconfigure
+      - terraform apply -auto-approve
   artifacts:
     reports:
       dotenv: deploy.env
