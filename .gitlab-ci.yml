@@ -18,11 +18,13 @@ default:
 
 sync-to-github:
   stage: sync
-  image: alpine/git:latest
+  image: 
+    name: alpine/git:latest
+    entrypoint: [""]
   variables:
     GIT_STRATEGY: clone
   script:
-    - git remote add https://github.com/piyush169/chaos-resilience.git
+    - git remote add github https://github.com/piyush169/chaos-resilience.git
     - git push github HEAD:main --force
     - git push github --tags
   only:
