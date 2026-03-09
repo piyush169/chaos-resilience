@@ -51,7 +51,7 @@ plan_infra:
     entrypoint: [""]
   id_tokens:
     GITLAB_OIDC_TOKEN:
-      aud: gitlab.com
+      aud: https://gitlab.com
   script:
     - *aws_oidc_setup
     - cd infra
@@ -70,7 +70,7 @@ apply_infra:
     entrypoint: [""]
   id_tokens:
     GITLAB_OIDC_TOKEN:
-      aud: gitlab.com
+      aud: https://gitlab.com
   needs: 
     - job: plan_infra
       artifacts: true
