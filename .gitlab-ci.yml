@@ -108,7 +108,7 @@ apply_infra:
       - cd infra
       - apk add --no-cache aws-cli
       - terraform init -reconfigure
-      - terraform apply -auto-approve
+      - terraform apply plan.cache
   artifacts:
     reports:
       dotenv: deploy.env
