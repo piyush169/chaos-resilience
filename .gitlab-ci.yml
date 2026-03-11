@@ -126,7 +126,9 @@ configure_networking:
   extends: .infra_job
   stage: deploy
   needs: [apply_infra]
-  image: hashicorp/terraform:latest 
+  image:
+    name: hashicorp/terraform:1.7.5
+    entrypoint: [""] 
   script:
     - apk add --no-cache aws-cli openssh-client
     - |
