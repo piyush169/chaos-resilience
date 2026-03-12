@@ -67,6 +67,7 @@ plan_infra:
 
 apply_infra:
   stage: deploy
+  extends: .infra_job
   image:
     name: hashicorp/terraform:latest
     entrypoint: [""]
@@ -91,13 +92,15 @@ apply_infra:
   before_script:
     - apk add --no-cache openssh-client terraform aws-cli
     - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> ../deploy.env
     - chmod 600 ~/.ssh/id_rsa
   
 
 configure_networking:
   stage: deploy
-  needs: [apply_infra]
+  needs:
+    - job: apply_infra
+      artifacts: true
   image: alpine:3.19
   script:
     - apk add --no-cache openssh-client
