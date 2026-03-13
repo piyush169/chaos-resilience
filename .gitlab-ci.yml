@@ -80,6 +80,8 @@ apply_infra:
   script:
       - *aws_oidc_setup
       - cd infra
+      - terraform output -raw ec2_public_ip
+      - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" > "$CI_PROJECT_DIR/deploy.env"
       - apk add --no-cache aws-cli
       - terraform init -reconfigure
       - terraform apply plan.cache
@@ -92,7 +94,7 @@ apply_infra:
   before_script:
     - apk add --no-cache openssh-client aws-cli
     - mkdir -p ~/.ssh
-    - echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> ../deploy.env
+    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
   
 
