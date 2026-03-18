@@ -105,8 +105,8 @@ configure_networking:
     - job: apply_infra
       artifacts: true
   image: alpine:3.19
+  before_script: *ssh_setup
   script:
-    - *ssh_setup
     - |
       ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         echo "Waiting for EC2 boot script (cloud-init) to finish..."
@@ -129,8 +129,8 @@ deploy_pods:
   stage: k8s_deploy
   image: alpine:3.19
   needs: [apply_infra, configure_networking]
+  before_script: *ssh_setup
   script:
-    - *ssh_setup
     - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "sudo chown -R ubuntu:ubuntu /home/ubuntu/k8s"
     - scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r k8s/ ubuntu@$EC2_PUBLIC_IP:/home/ubuntu/
     - |
@@ -146,8 +146,8 @@ observe_cluster:
     - job: apply_infra
       artifacts: true
     - job: deploy_pods
+  before_script: *ssh_setup
   script:
-    - *ssh_setup
     - |
       ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
         helm upgrade --install redis-exporter prometheus-community/prometheus-redis-exporter \
