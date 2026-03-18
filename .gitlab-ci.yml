@@ -107,7 +107,6 @@ configure_networking:
   needs:
     - job: apply_infra
       artifacts: true
-  image: alpine:3.19
   script:
     - |
       ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
@@ -130,7 +129,6 @@ configure_networking:
 deploy_pods:
   extends: .ssh_job
   stage: k8s_deploy
-  image: alpine:3.19
   needs: [apply_infra, configure_networking]
   script:
     - ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "sudo chown -R ubuntu:ubuntu /home/ubuntu/k8s"
@@ -144,7 +142,6 @@ deploy_pods:
 observe_cluster:
   extends: .ssh_job
   stage: observe
-  image: alpine:3.19
   needs:
     - job: apply_infra
       artifacts: true
