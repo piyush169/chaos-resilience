@@ -116,4 +116,3 @@ resource "aws_instance" "chaos_target" {
             EOF
   
 }
-
