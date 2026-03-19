@@ -141,17 +141,37 @@ deploy_pods:
 observe_cluster:
   extends: .ssh_job
   stage: observe
+  when: manual
+  allow_failure: true
   needs:
     - job: apply_infra
       artifacts: true
     - job: deploy_pods
   script:
     - |
-      ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+      ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP << 'EOF'
+        # Install Helm 
+        if ! command -v helm &> /dev/null; then
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        fi
+        
+        # Add Prometheus 
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+        helm repo update
+        
+        # Install Prometheus Operator 
+        helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+          --namespace monitoring --create-namespace
+        
+        # Install Redis exporter
         helm upgrade --install redis-exporter prometheus-community/prometheus-redis-exporter \
           --set redisAddress=redis-service.default.svc.cluster.local:6379
         
-        # Apply your ServiceMonitor and Dashboard ConfigMap so they don't vanish on restart
-        minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
-        minikube kubectl -- apply -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml
+        # Apply monitoring configs 
+        if [ -f /home/ubuntu/k8s/service-monitor.yaml ]; then
+          minikube kubectl -- apply -f /home/ubuntu/k8s/service-monitor.yaml
+        fi
+        if [ -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml ]; then
+          minikube kubectl -- apply -f /home/ubuntu/k8s/grafana-dashboard-cm.yaml
+        fi
       EOF
