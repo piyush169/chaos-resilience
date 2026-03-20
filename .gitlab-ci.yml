@@ -30,7 +30,7 @@ variables:
 
 default:
   tags:
-    - docker-runner
+    - gitlab-runner
 
 sync-to-github:
   stage: sync
