@@ -37,6 +37,8 @@ sync-to-github:
   image: 
     name: alpine/git:latest
     entrypoint: [""]
+  tags:
+    - docker-runner
   variables:
     GIT_STRATEGY: clone
   script:
