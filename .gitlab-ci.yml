@@ -151,8 +151,6 @@ deploy_pods:
 observe_cluster:
   extends: .ssh_job
   stage: observe
-  when: manual
-  allow_failure: true
   needs:
     - job: apply_infra
       artifacts: true
